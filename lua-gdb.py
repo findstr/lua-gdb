@@ -185,7 +185,7 @@ class CallInfoValue:
             else:
                 self.what = "Lua"
 
-            self.currentpc = (self.ci['u']['l']['savedpc'] - proto['code']) - 1 
+            self.currentpc = (self.ci['u']['l']['savedpc'] - proto['code']) - 1
             self.currentline = self.getfuncline(proto, self.currentpc)
 
         else:
@@ -251,7 +251,7 @@ class CallInfoValue:
 
     def is_fin(self):
         return self.ci['callstatus'] & CallInfoValue.CIST_FIN
-    
+
     # stack frame information
     def frame_info(self):
         return '%s:%d: in %s' % (self.source, self.currentline, self.funcname)
@@ -305,7 +305,7 @@ class CallInfoValue:
             return
 
         if self.proto['is_vararg'] != 1:
-            return 
+            return
 
         nextra = self.ci['u']['l']['nextraargs']
         for i in xrange(nextra):
@@ -409,6 +409,7 @@ class TablePrinter:
         return "<table 0x%x>" % int(self.val.address)
 
     def children(self):
+        '''
         setMarked = False
         if TablePrinter.marked == None:
             TablePrinter.marked = {}
@@ -445,10 +446,10 @@ class TablePrinter:
             }
             yield str(2*i + 2*j), tvaluestring(fakeTValue)
             yield str(2*i + 2*j + 1), value
-
+            return
         if setMarked:
             TablePrinter.marked = None
-
+        '''
     def realasize(self):
         def isrealasize(self): return (self.val['flags'] & (1<<7)) == 0
         def ispow2(x): return (((x) & ((x) - 1)) == 0)
@@ -567,7 +568,7 @@ as the lua_State*. You can provide an alternate lua_State as the first argument.
             i = i + 1
 
 class LuaTracebackCmd(gdb.Command):
-    """luabacktrace [L]
+    """luatraceback [L]
 Dumps Lua execution stack, as debug.traceback() does. Without
 arguments, uses the current value of "L" as the
 lua_State*. You can provide an alternate lua_State as the
@@ -576,22 +577,23 @@ first argument.
     def __init__(self):
         gdb.Command.__init__(self, "luatraceback", gdb.COMMAND_STACK, gdb.COMPLETE_NONE)
 
-    def invoke(self, args, _from_tty): 
+    def invoke(self, args, _from_tty):
         argv = gdb.string_to_argv(args)
         if len(argv) > 0:
-            L = cast_luaState(gdb.parse_and_eval(argv[0]))
+            Lname = argv[0];
         else:
-            L = gdb.parse_and_eval("L")
-
-        ci = L['ci']
-        print("stack traceback:")
-        while ci != L['base_ci'].address:
-            cv = CallInfoValue(L, ci)
-            print('\t%s' % (cv.frame_info()))
-            if cv.is_tailcall():
-                print('\t(...tail calls...)')
-            ci = ci['previous']
-
+            Lname = "L";
+        if gdb.lookup_symbol(Lname)[0] != None:
+            sn = 0
+            L = cast_luaState(gdb.parse_and_eval(Lname));
+            ci = L['ci']
+            while ci != L['base_ci'].address:
+                cv = CallInfoValue(L, ci)
+                print('#%d  %s' % (sn, cv.frame_info()))
+                if cv.is_tailcall():
+                    print('\t(...tail calls...)')
+                ci = ci['previous']
+                sn = sn + 1;
 
 class LuaCoroutinesCmd(gdb.Command):
     """luacoroutines [L]
@@ -602,7 +604,7 @@ first argument.
     def __init__(self):
         gdb.Command.__init__(self, "luacoroutines", gdb.COMMAND_STACK, gdb.COMPLETE_NONE)
 
-    def invoke(self, args, _from_tty): 
+    def invoke(self, args, _from_tty):
         argv = gdb.string_to_argv(args)
         if len(argv) > 0:
             L = cast_luaState(gdb.parse_and_eval(argv[0]))
@@ -622,12 +624,12 @@ first argument.
             obj = obj['next']
 
 class LuaGetLocalCmd(gdb.Command):
-    """luagetlocal [L [f]]
-Print all local variables of the function at level 'f' of the stack 'thread'. 
+    """lp [L [f]]
+Print all local variables of the function at level 'f' of the stack 'thread'.
 With no arguments, Dump all local variable of the current funtion in the stack of 'L';
     """
     def __init__(self):
-        gdb.Command.__init__(self, "luagetlocal", gdb.COMMAND_STACK, gdb.COMPLETE_NONE)
+        gdb.Command.__init__(self, "lp", gdb.COMMAND_STACK, gdb.COMPLETE_NONE)
 
     def invoke(self, args, _from_tty):
         argv = gdb.string_to_argv(args)
@@ -641,9 +643,9 @@ With no arguments, Dump all local variable of the current funtion in the stack o
         else:
             arg2 = gdb.parse_and_eval("0")
 
-        level = arg2 
+        level = arg2
         ci = L['ci']
-        while level > 0: 
+        while level > 0:
             ci = ci['previous']
             if ci == L['base_ci'].address:
                 break
@@ -654,7 +656,7 @@ With no arguments, Dump all local variable of the current funtion in the stack o
             return
 
         cv = CallInfoValue(L, ci)
-        print("call info: %s" % cv.frame_info())
+        print("call info: %s" % (cv.frame_info()))
 
         for name, var in cv.upvars():
             print("\tupval %s = %s" % (name, var.dereference()))
@@ -669,3 +671,5 @@ LuaStackCmd()
 LuaTracebackCmd()
 LuaCoroutinesCmd()
 LuaGetLocalCmd()
+
+
